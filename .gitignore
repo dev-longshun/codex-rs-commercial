@@ -4,7 +4,11 @@ cli-proxy-api
 
 # Configuration
 config.yaml
-.env
+.env*
+!.env.example
+*.local
+*.secret
+*.secrets
 
 # Generated content
 bin/*
@@ -24,6 +28,25 @@ static/*
 # Authentication data
 auths/*
 !auths/.gitkeep
+.claude/.credentials/*
+.kiro/auth/*
+.codex/auth/*
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+
+# Local cloud credentials
+.aws/*
+.azure/*
+.gcp/*
+.config/gcloud/*
 
 # Documentation
 docs/*
