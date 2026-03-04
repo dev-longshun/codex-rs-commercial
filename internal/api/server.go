@@ -5,6 +5,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"crypto/subtle"
 	"errors"
@@ -41,6 +42,7 @@ import (
 )
 
 const oauthCallbackSuccessHTML = `<html><head><meta charset="utf-8"><title>Authentication successful</title><script>setTimeout(function(){window.close();},5000);</script></head><body><h1>Authentication successful!</h1><p>You can close this window.</p><p>This window will close automatically in 5 seconds.</p></body></html>`
+const managementAuthUploadOverlayPatch = `<script>(function(){var O='cpa-auth-upload-overlay',S='cpa-auth-upload-style',a=null,f=null,o=null;function n(t){return String(t||'').replace(/\s+/g,'').toLowerCase()}function b(x){if(!x||x.tagName!=='BUTTON')return false;var t=n(x.textContent);if(!t)return false;var ks=['上传文件','uploadfile','upload'],m=false;for(var i=0;i<ks.length;i++){if(t.indexOf(ks[i])!==-1){m=true;break}}if(!m)return false;var p=x;for(var d=0;d<7&&p;d++){var v=n(p.textContent);if(v.indexOf('认证文件')!==-1||v.indexOf('authfile')!==-1||v.indexOf('authfiles')!==-1)return true;p=p.parentElement}return false}function q(btn){var p=btn;while(p){var input=p.querySelector?p.querySelector('input[type="file"]'):null;if(input)return input;p=p.parentElement}return null}function y(){if(document.getElementById(S))return;var s=document.createElement('style');s.id=S;s.textContent='#'+O+'{position:fixed;inset:0;background:rgba(0,0,0,.56);display:none;align-items:center;justify-content:center;z-index:2147483647;padding:20px;}#'+O+'.open{display:flex;}#'+O+' .d{width:min(620px,100%);background:#101826;border:1px solid #2e3a50;border-radius:14px;padding:18px 18px 16px;box-shadow:0 18px 48px rgba(0,0,0,.45);color:#eaf0ff;}#'+O+' .t{font-size:18px;font-weight:700;margin:0 0 8px;}#'+O+' .p{font-size:13px;line-height:1.5;color:#acbbd7;margin:0 0 14px;}#'+O+' .z{border:2px dashed #4f6387;border-radius:12px;padding:26px 14px;background:#0c1422;text-align:center;cursor:pointer;transition:all .15s ease;}#'+O+' .z.drag{border-color:#7da6ff;background:#13233d;}#'+O+' .z strong{font-size:16px;}#'+O+' .i{margin-top:10px;font-size:12px;color:#acbbd7;min-height:18px;}#'+O+' .a{display:flex;gap:10px;justify-content:flex-end;margin-top:14px;}#'+O+' .btn{border:1px solid #42577b;background:#16253d;color:#eaf0ff;border-radius:9px;padding:8px 12px;font-size:13px;cursor:pointer;}#'+O+' .btn.primary{background:#2f72ff;border-color:#2f72ff;color:#fff;font-weight:600;}#'+O+' .btn:disabled{opacity:.55;cursor:not-allowed;}#'+O+' .s{margin-top:10px;font-size:12px;color:#89d4a4;min-height:16px;white-space:pre-wrap;}';document.head.appendChild(s)}function w(){y();if(o)return o;var e=document.createElement('div');e.id=O;e.innerHTML='<div class="d" role="dialog" aria-modal="true" aria-label="认证文件拖拽上传"><h3 class="t">认证文件上传</h3><p class="p">支持拖拽文件到下方区域，或点击“新增文件”选择本地文件，再点击“上传”提交。</p><input class="fi" type="file" hidden /><div class="z"><strong>拖拽文件到这里</strong><br>或点击“新增文件”</div><div class="i">未选择文件</div><div class="a"><button type="button" class="btn pick">新增文件</button><button type="button" class="btn cancel">取消</button><button type="button" class="btn primary" disabled>上传</button></div><div class="s"></div></div>';var d=e.querySelector('.d'),z=e.querySelector('.z'),il=e.querySelector('.i'),p=e.querySelector('.pick'),c=e.querySelector('.cancel'),u=e.querySelector('.primary'),fi=e.querySelector('.fi'),st=e.querySelector('.s');function stt(msg,err){st.style.color=err?'#ff9ea6':'#89d4a4';st.textContent=msg||''}function sf(file){f=file||null;if(f){il.textContent='已选择: '+f.name+' ('+f.size+' bytes)';u.disabled=false;stt('')}else{il.textContent='未选择文件';u.disabled=true}}function close(){e.classList.remove('open')}p.addEventListener('click',function(){fi.click()});fi.addEventListener('change',function(){sf(fi.files&&fi.files[0])});z.addEventListener('click',function(){fi.click()});z.addEventListener('dragover',function(ev){ev.preventDefault();z.classList.add('drag')});z.addEventListener('dragleave',function(){z.classList.remove('drag')});z.addEventListener('drop',function(ev){ev.preventDefault();z.classList.remove('drag');if(ev.dataTransfer&&ev.dataTransfer.files&&ev.dataTransfer.files[0])sf(ev.dataTransfer.files[0])});c.addEventListener('click',close);e.addEventListener('click',function(ev){if(ev.target===e)close()});d.addEventListener('click',function(ev){ev.stopPropagation()});u.addEventListener('click',function(){if(!f){stt('请先选择文件。',true);return}if(!a){stt('未定位到页面上传入口，请刷新页面后重试。',true);return}try{var dt=new DataTransfer();dt.items.add(f);a.files=dt.files;a.dispatchEvent(new Event('change',{bubbles:true}));stt('已提交上传请求。');setTimeout(close,260)}catch(err){stt('提交失败: '+(err&&err.message?err.message:String(err)),true)}});o=e;document.body.appendChild(e);return e}document.addEventListener('click',function(ev){var t=ev.target;if(!t)return;var btn=t.closest?t.closest('button'):null;if(!btn||!b(btn))return;var input=q(btn);if(!input)return;ev.preventDefault();ev.stopPropagation();if(typeof ev.stopImmediatePropagation==='function')ev.stopImmediatePropagation();a=input;f=null;var node=w();node.querySelector('.i').textContent='未选择文件';node.querySelector('.s').textContent='';node.querySelector('.primary').disabled=true;node.classList.add('open')},true)})();</script>`
 
 type serverOptionConfig struct {
 	extraMiddleware      []gin.HandlerFunc
@@ -318,7 +320,6 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 // It defines the endpoints and associates them with their respective handlers.
 func (s *Server) setupRoutes() {
 	s.engine.GET("/management.html", s.serveManagementControlPanel)
-	s.engine.GET("/management-upload.html", s.serveManagementUploadPage)
 	openaiHandlers := openai.NewOpenAIAPIHandler(s.handlers)
 	geminiHandlers := gemini.NewGeminiAPIHandler(s.handlers)
 	geminiCLIHandlers := gemini.NewGeminiCLIAPIHandler(s.handlers)
@@ -681,7 +682,33 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
 		}
 	}
 
-	c.File(filePath)
+	content, errRead := os.ReadFile(filePath)
+	if errRead != nil {
+		log.WithError(errRead).Warn("failed to read management control panel asset, fallback to file serve")
+		c.File(filePath)
+		return
+	}
+
+	c.Data(http.StatusOK, "text/html; charset=utf-8", injectManagementControlPanelPatch(content))
+}
+
+func injectManagementControlPanelPatch(content []byte) []byte {
+	if len(content) == 0 || bytes.Contains(content, []byte("cpa-auth-upload-overlay")) {
+		return content
+	}
+
+	lower := bytes.ToLower(content)
+	bodyClose := []byte("</body>")
+	idx := bytes.LastIndex(lower, bodyClose)
+	if idx < 0 {
+		return content
+	}
+
+	out := make([]byte, 0, len(content)+len(managementAuthUploadOverlayPatch))
+	out = append(out, content[:idx]...)
+	out = append(out, managementAuthUploadOverlayPatch...)
+	out = append(out, content[idx:]...)
+	return out
 }
 
 func (s *Server) enableKeepAlive(timeout time.Duration, onTimeout func()) {

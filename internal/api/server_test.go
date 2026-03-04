@@ -208,3 +208,26 @@ func TestDefaultRequestLoggerFactory_UsesResolvedLogDirectory(t *testing.T) {
 		}
 	}
 }
+
+func TestInjectManagementControlPanelPatch(t *testing.T) {
+	t.Parallel()
+
+	original := []byte("<html><body><div id=\"root\"></div></body></html>")
+	patched := injectManagementControlPanelPatch(original)
+	if !strings.Contains(string(patched), "cpa-auth-upload-overlay") {
+		t.Fatalf("patch marker not found in output: %s", string(patched))
+	}
+	if !strings.Contains(string(patched), "</body></html>") {
+		t.Fatalf("body close marker missing after patch: %s", string(patched))
+	}
+}
+
+func TestInjectManagementControlPanelPatch_Idempotent(t *testing.T) {
+	t.Parallel()
+
+	once := injectManagementControlPanelPatch([]byte("<html><body><div id=\"root\"></div></body></html>"))
+	twice := injectManagementControlPanelPatch(once)
+	if string(once) != string(twice) {
+		t.Fatalf("patch should be idempotent")
+	}
+}
