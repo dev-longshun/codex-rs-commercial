@@ -6,9 +6,9 @@ This folder provides end-user setup scripts for Codex CLI with your proxy endpoi
 
 - Check/install Node.js and npm
 - Install or update `@openai/codex` to latest
-- Ask user for:
-  - Base URL
-  - API key
+- Ask user to paste config text once (smart parsing), for example:
+  - `API Base URL: https://your-domain`
+  - `API Key: sk-xxxxxx`
 - Write:
   - `OPENAI_BASE_URL`
   - `OPENAI_API_KEY`
@@ -22,6 +22,10 @@ This folder provides end-user setup scripts for Codex CLI with your proxy endpoi
 
 ## Notes
 
+- Supports parsing these formats:
+  - `API Base URL: ...` / `Base URL: ...` / `URL: ...`
+  - `API Key: ...` / `Key: ...`
+  - `OPENAI_BASE_URL=...` / `OPENAI_API_KEY=...`
 - Base URL entered as host will be normalized to include `/v1`.
+- For Windows PowerShell 5.1 compatibility, keep `setup-codex-windows.ps1` as UTF-8 with BOM if you edit and save it manually.
 - Keep API keys private and rotate periodically.
-

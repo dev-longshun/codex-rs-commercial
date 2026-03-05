@@ -172,8 +172,67 @@ $BLOCK_END
 EOF2
 }
 
+read_config_block() {
+  local line block=""
+  while IFS= read -r line; do
+    line="$(trim "$line")"
+    if [[ -z "$line" ]]; then
+      break
+    fi
+    block+="$line"$'\n'
+  done
+  printf '%s' "$block"
+}
+
+extract_config_value() {
+  local block="$1"
+  local field="$2"
+
+  printf '%s\n' "$block" | awk -v field="$field" '
+    function trim(s) {
+      sub(/^[[:space:]]+/, "", s)
+      sub(/[[:space:]]+$/, "", s)
+      return s
+    }
+    {
+      line=$0
+      gsub(/\r/, "", line)
+      low=tolower(line)
+
+      if (field == "url") {
+        if (low ~ /^[[:space:]]*api[[:space:]]*base[[:space:]]*url[[:space:]]*:/ ||
+            low ~ /^[[:space:]]*base[[:space:]]*url[[:space:]]*:/ ||
+            low ~ /^[[:space:]]*url[[:space:]]*:/ ||
+            low ~ /^[[:space:]]*openai_base_url[[:space:]]*=/) {
+          if (low ~ /^[[:space:]]*openai_base_url[[:space:]]*=/) {
+            sub(/^[^=]*=[[:space:]]*/, "", line)
+          } else {
+            sub(/^[^:]*:[[:space:]]*/, "", line)
+          }
+          print trim(line)
+          exit
+        }
+      }
+
+      if (field == "key") {
+        if (low ~ /^[[:space:]]*api[[:space:]]*key[[:space:]]*:/ ||
+            low ~ /^[[:space:]]*key[[:space:]]*:/ ||
+            low ~ /^[[:space:]]*openai_api_key[[:space:]]*=/) {
+          if (low ~ /^[[:space:]]*openai_api_key[[:space:]]*=/) {
+            sub(/^[^=]*=[[:space:]]*/, "", line)
+          } else {
+            sub(/^[^:]*:[[:space:]]*/, "", line)
+          }
+          print trim(line)
+          exit
+        }
+      }
+    }
+  '
+}
+
 resolve_config() {
-  local existing_url existing_key masked_key answer input_url input_key
+  local existing_url existing_key masked_key input_block input_url input_key
 
   existing_url="$(current_saved_config OPENAI_BASE_URL)"
   existing_key="$(current_saved_config OPENAI_API_KEY)"
@@ -196,35 +255,42 @@ resolve_config() {
     log "未检测到历史配置。"
   fi
 
+  log "请粘贴配置文本（支持以下格式）："
+  log "API Base URL: https://your-domain"
+  log "API Key: sk-xxxxxx"
+  log "粘贴完成后，输入一个空行结束。"
   if [[ -n "$existing_url" && -n "$existing_key" ]]; then
-    read -r -p "是否更新 URL/API Key？[y/N]: " answer
-    answer="$(trim "$answer")"
-    if [[ ! "$answer" =~ ^[Yy]$ ]]; then
+    log "直接输入空行可沿用当前配置。"
+  fi
+
+  input_block="$(read_config_block)"
+  if [[ -z "$input_block" ]]; then
+    if [[ -n "$existing_url" && -n "$existing_key" ]]; then
       RESOLVED_URL="$existing_url"
       RESOLVED_KEY="$existing_key"
       log "沿用当前配置。"
       return 0
     fi
+    log "未读取到配置文本。"
+    pause_exit 1
   fi
 
-  read -r -p "请输入 Base URL（示例: https://your-domain 或 http://127.0.0.1:8317）${existing_url:+（回车沿用当前）}: " input_url
+  input_url="$(extract_config_value "$input_block" "url")"
+  input_key="$(extract_config_value "$input_block" "key")"
+
+  if [[ -z "$input_url" ]]; then
+    input_url="$(printf '%s\n' "$input_block" | grep -Eo 'https?://[^[:space:]]+' | head -n 1 || true)"
+  fi
+
+  if [[ -z "$input_key" ]]; then
+    input_key="$(printf '%s\n' "$input_block" | grep -Eo 'sk-[A-Za-z0-9._-]+' | head -n 1 || true)"
+  fi
+
   input_url="$(trim "$input_url")"
-  if [[ -z "$input_url" && -n "$existing_url" ]]; then
-    input_url="$existing_url"
-  fi
-
-  if [[ -n "$existing_key" ]]; then
-    read -r -p "请输入 API Key（回车沿用当前）: " input_key
-  else
-    read -r -p "请输入 API Key: " input_key
-  fi
   input_key="$(trim "$input_key")"
-  if [[ -z "$input_key" && -n "$existing_key" ]]; then
-    input_key="$existing_key"
-  fi
 
   if [[ -z "$input_url" || -z "$input_key" ]]; then
-    log "Base URL 和 API Key 不能为空。"
+    log "无法识别 Base URL 或 API Key，请按示例格式重新输入。"
     pause_exit 1
   fi
 

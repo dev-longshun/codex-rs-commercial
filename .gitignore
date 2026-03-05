@@ -31,6 +31,7 @@ auths/*
 .claude/.credentials/*
 .kiro/auth/*
 .codex/auth/*
+.codex-bigmodeltoken/*
 
 # Private keys and certificates
 *.pem
