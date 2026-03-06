@@ -170,6 +170,72 @@ $BLOCK_END
 EOF2
 }
 
+write_codex_config_toml() {
+  local config_dir="$HOME/.codex"
+  local config_file="$config_dir/config.toml"
+  local base_url="$1"
+  local tmp_file
+
+  mkdir -p "$config_dir"
+  tmp_file="$(mktemp)"
+
+  if [[ -f "$config_file" ]]; then
+    awk '
+      BEGIN { skip_provider = 0 }
+      {
+        line = $0
+
+        if (!skip_provider && line ~ /^[[:space:]]*\[model_providers\.bigmodeltoken\][[:space:]]*$/) {
+          skip_provider = 1
+          next
+        }
+        if (skip_provider) {
+          if (line ~ /^[[:space:]]*\[[^]]+\][[:space:]]*$/ || line ~ /^[[:space:]]*\[\[[^]]+\]\][[:space:]]*$/) {
+            skip_provider = 0
+          } else {
+            next
+          }
+        }
+
+        if (line ~ /^[[:space:]]*model_provider[[:space:]]*=/) next
+        if (line ~ /^[[:space:]]*model[[:space:]]*=/) next
+        if (line ~ /^[[:space:]]*model_reasoning_effort[[:space:]]*=/) next
+        if (line ~ /^[[:space:]]*network_access[[:space:]]*=/) next
+        if (line ~ /^[[:space:]]*disable_response_storage[[:space:]]*=/) next
+        if (line ~ /^[[:space:]]*windows_wsl_setup_acknowledged[[:space:]]*=/) next
+        if (line ~ /^[[:space:]]*model_verbosity[[:space:]]*=/) next
+
+        print line
+      }
+    ' "$config_file" > "$tmp_file"
+  else
+    : > "$tmp_file"
+  fi
+
+  cat > "$config_file" <<EOF2
+model_provider = "bigmodeltoken"
+model = "gpt-5.4"
+model_reasoning_effort = "high"
+network_access = "enabled"
+disable_response_storage = true
+windows_wsl_setup_acknowledged = true
+model_verbosity = "high"
+
+[model_providers.bigmodeltoken]
+name = "bigmodeltoken"
+base_url = "$base_url"
+wire_api = "responses"
+requires_openai_auth = true
+EOF2
+
+  if [[ -s "$tmp_file" ]]; then
+    printf '\n' >> "$config_file"
+    cat "$tmp_file" >> "$config_file"
+  fi
+
+  rm -f "$tmp_file"
+}
+
 read_config_block() {
   local line block=""
   while IFS= read -r line; do
@@ -322,6 +388,7 @@ main() {
   if [[ -f "$HOME/.zshrc" ]]; then
     write_profile_block "$HOME/.zshrc" "$base_url" "$RESOLVED_KEY"
   fi
+  write_codex_config_toml "$base_url"
 
   export OPENAI_BASE_URL="$base_url"
   export OPENAI_API_KEY="$RESOLVED_KEY"
@@ -330,6 +397,7 @@ main() {
   log "配置完成。"
   log "OPENAI_BASE_URL=$OPENAI_BASE_URL"
   log "API Key=$(mask_api_key "$OPENAI_API_KEY")"
+  log "已写入 ~/.codex/config.toml（默认模型 gpt-5.4，推理强度 high）"
   log "请执行: source ~/.bashrc（或重开终端）后运行 codex"
 }
 
